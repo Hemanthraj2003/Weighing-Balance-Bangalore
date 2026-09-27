@@ -1,0 +1,27 @@
+{
+  "name": "weighing-balance-nextjs",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.4.1",
+    "bcryptjs": "^3.0.2",
+    "cloudinary": "^2.5.1",
+    "jose": "^6.0.8",
+    "jsonwebtoken": "^9.0.2",
+    "lucide-react": "^1.37.0",
+    "next": "^15.2.1",
+    "pdf-lib": "^1.17.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "sharp": "^0.35.4"
+  },
+  "devDependencies": {
+    "prisma": "^6.4.1"
+  }
+}

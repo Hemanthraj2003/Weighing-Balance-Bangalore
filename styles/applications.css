@@ -1,0 +1,651 @@
+/* =========================================
+   APPLICATIONS PAGE
+========================================= */
+
+.applications-page,
+.applications-page * {
+    box-sizing: border-box;
+}
+
+.applications-page {
+    width: 100%;
+    background: #f5f6f8;
+    font-family: Arial, Helvetica, sans-serif;
+    color: #292929;
+}
+
+
+/* =========================================
+   TOP RED BANNER
+========================================= */
+
+.applications-banner {
+    width: 100%;
+    min-height: 112px;
+
+    padding: 20px 52px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    color: #ffffff;
+
+    background:
+        linear-gradient(
+            135deg,
+            #b90000 0%,
+            #cf0000 48%,
+            #b70000 100%
+        );
+}
+
+.applications-banner-left h1 {
+    margin: 0 0 7px;
+
+    font-size: 32px;
+    font-weight: 700;
+}
+
+.applications-banner-left p {
+    margin: 0;
+
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.applications-banner-left p span {
+    margin: 0 5px;
+}
+
+
+.applications-banner-right {
+    display: flex;
+    align-items: center;
+
+    gap: 20px;
+
+    padding-left: 45px;
+
+    border-left:
+        1px solid rgba(255, 255, 255, 0.35);
+}
+
+.applications-banner-icon {
+    font-size: 42px;
+    line-height: 1;
+}
+
+.applications-banner-right h3 {
+    margin: 0 0 6px;
+
+    font-size: 15px;
+    font-weight: 700;
+
+    letter-spacing: 0.2px;
+}
+
+.applications-banner-right p {
+    margin: 0;
+
+    font-size: 12px;
+}
+
+
+/* =========================================
+   MAIN CONTAINER
+========================================= */
+
+.applications-container {
+    width: 100%;
+    max-width: 1500px;
+
+    margin: 0 auto;
+
+    padding: 14px 50px 10px;
+
+    display: grid;
+
+    grid-template-columns:
+        285px minmax(0, 1fr);
+
+    gap: 26px;
+}
+
+
+/* =========================================
+   LEFT SIDEBAR
+========================================= */
+
+.applications-sidebar {
+    width: 100%;
+}
+
+
+.application-sidebar-box {
+    background: #ffffff;
+
+    border: 1px solid #dddddd;
+    border-radius: 7px;
+
+    padding: 13px 14px;
+
+    box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.03);
+}
+
+.application-sidebar-box h2 {
+    margin: 0 0 12px;
+
+    padding-bottom: 8px;
+
+    font-size: 14px;
+    font-weight: 700;
+
+    letter-spacing: 0.5px;
+
+    border-bottom: 1px solid #e9e9e9;
+}
+
+
+/* =========================================
+   APPLICATION CATEGORY BUTTONS
+========================================= */
+
+.application-category-list {
+    width: 100%;
+}
+
+.application-category-button {
+    width: 100%;
+    min-height: 36px;
+
+    padding: 7px 4px;
+
+    display: flex;
+    align-items: center;
+
+    gap: 10px;
+
+    background: transparent;
+
+    border: none;
+    border-bottom: 1px solid #eeeeee;
+
+    cursor: pointer;
+
+    color: #343434;
+
+    text-align: left;
+
+    font-size: 13px;
+
+    transition: 0.2s ease;
+}
+
+.application-category-button:last-child {
+    border-bottom: none;
+}
+
+.application-category-button:hover {
+    color: #c80000;
+
+    padding-left: 8px;
+}
+
+.application-category-button.active {
+    color: #c40000;
+    font-weight: 700;
+}
+
+.application-category-icon {
+    width: 23px;
+
+    color: #c90000;
+
+    font-size: 18px;
+
+    text-align: center;
+}
+
+
+/* =========================================
+   HELP BOX
+========================================= */
+
+.application-help-box {
+    margin-top: 14px;
+
+    padding: 17px 20px 18px;
+
+    text-align: center;
+
+    background:
+        linear-gradient(
+            135deg,
+            #ffffff,
+            #fff5f5
+        );
+
+    border: 1px solid #dddddd;
+    border-radius: 7px;
+
+    box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.03);
+}
+
+.help-icon {
+    margin-bottom: 7px;
+
+    color: #c90000;
+
+    font-size: 34px;
+}
+
+.application-help-box h3 {
+    margin: 0 0 12px;
+
+    font-size: 13px;
+    line-height: 19px;
+
+    font-weight: 700;
+}
+
+.application-help-box p {
+    margin: 0 0 17px;
+
+    color: #555555;
+
+    font-size: 11px;
+    line-height: 18px;
+}
+
+.application-contact-button {
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    min-width: 120px;
+    height: 35px;
+
+    padding: 0 18px;
+
+    background: #c90000;
+
+    color: #ffffff;
+
+    border-radius: 4px;
+
+    text-decoration: none;
+
+    font-size: 12px;
+    font-weight: 700;
+
+    transition: 0.2s ease;
+}
+
+.application-contact-button:hover {
+    background: #a80000;
+}
+
+.application-contact-button span {
+    margin-left: 8px;
+}
+
+
+/* =========================================
+   MAIN APPLICATION AREA
+========================================= */
+
+.applications-main {
+    min-width: 0;
+}
+
+
+/* =========================================
+   APPLICATION GRID
+========================================= */
+
+.applications-grid {
+    width: 100%;
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(4, minmax(0, 1fr));
+
+    gap: 12px;
+}
+
+
+/* =========================================
+   APPLICATION CARD
+========================================= */
+
+.application-card {
+    min-width: 0;
+
+    background: #ffffff;
+
+    border: 1px solid #dddddd;
+    border-radius: 6px;
+
+    overflow: hidden;
+
+    transition: 0.25s ease;
+
+    box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.025);
+}
+
+.application-card:hover {
+    transform: translateY(-3px);
+
+    box-shadow:
+        0 7px 20px rgba(0, 0, 0, 0.10);
+}
+
+
+/* =========================================
+   APPLICATION IMAGE
+========================================= */
+
+.application-image-box {
+    width: 100%;
+    height: 153px;
+
+    overflow: hidden;
+
+    background: #eeeeee;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.application-image-box img {
+    width: 100%;
+    height: 100%;
+
+    object-fit: cover;
+
+    display: block;
+
+    transition: transform 0.35s ease;
+}
+
+.application-card:hover
+.application-image-box img {
+    transform: scale(1.04);
+}
+
+
+/* =========================================
+   CARD CONTENT
+========================================= */
+
+.application-card-content {
+    min-height: 112px;
+
+    padding: 10px 18px 12px;
+
+    display: flex;
+    flex-direction: column;
+}
+
+.application-card-content h3 {
+    margin: 0 0 6px;
+
+    color: #303030;
+
+    font-size: 13px;
+    line-height: 18px;
+
+    font-weight: 700;
+}
+
+.application-card-content p {
+    margin: 0;
+
+    color: #454545;
+
+    font-size: 11px;
+    line-height: 17px;
+
+    flex: 1;
+}
+
+.application-view-link {
+    width: fit-content;
+
+    margin-top: 9px;
+
+    color: #c40000;
+
+    text-decoration: none;
+
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.application-view-link:hover {
+    color: #e00000;
+}
+
+.application-view-link span {
+    margin-left: 8px;
+}
+
+
+/* =========================================
+   BOTTOM BENEFITS
+========================================= */
+
+.application-benefits {
+    width: 100%;
+    max-width: 1500px;
+
+    margin: 0 auto;
+
+    padding: 8px 50px 12px;
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(4, 1fr);
+
+    gap: 0;
+}
+
+.application-benefit {
+    min-height: 78px;
+
+    padding: 12px 25px;
+
+    display: flex;
+    align-items: center;
+
+    gap: 16px;
+
+    background: #ffffff;
+
+    border-top: 1px solid #e1e1e1;
+    border-bottom: 1px solid #e1e1e1;
+
+    position: relative;
+}
+
+.application-benefit:first-child {
+    border-left: 1px solid #e1e1e1;
+
+    border-radius:
+        6px 0 0 6px;
+}
+
+.application-benefit:last-child {
+    border-right: 1px solid #e1e1e1;
+
+    border-radius:
+        0 6px 6px 0;
+}
+
+.application-benefit:not(:last-child)::after {
+    content: "";
+
+    position: absolute;
+
+    right: 0;
+    top: 15px;
+
+    width: 1px;
+    height: 48px;
+
+    background: #d6d6d6;
+}
+
+.benefit-icon {
+    color: #cf0000;
+
+    font-size: 30px;
+
+    flex-shrink: 0;
+}
+
+.application-benefit h3 {
+    margin: 0 0 5px;
+
+    font-size: 13px;
+    font-weight: 700;
+
+    color: #303030;
+}
+
+.application-benefit p {
+    margin: 0;
+
+    font-size: 10px;
+    line-height: 16px;
+
+    color: #555555;
+}
+
+
+/* =========================================
+   RESPONSIVE
+========================================= */
+
+@media (max-width: 1250px) {
+
+    .applications-grid {
+        grid-template-columns:
+            repeat(3, minmax(0, 1fr));
+    }
+
+    .application-benefits {
+        grid-template-columns:
+            repeat(2, 1fr);
+    }
+
+}
+
+
+@media (max-width: 950px) {
+
+    .applications-container {
+        grid-template-columns:
+            230px minmax(0, 1fr);
+
+        padding: 14px 20px;
+
+        gap: 18px;
+    }
+
+    .applications-grid {
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+    }
+
+    .applications-banner {
+        padding: 20px;
+    }
+
+    .application-benefits {
+        padding: 8px 20px 12px;
+    }
+
+}
+
+
+@media (max-width: 700px) {
+
+    .applications-banner {
+        flex-direction: column;
+
+        align-items: flex-start;
+
+        gap: 16px;
+    }
+
+    .applications-banner-right {
+        padding-left: 0;
+
+        border-left: none;
+    }
+
+    .applications-container {
+        display: block;
+    }
+
+    .applications-sidebar {
+        margin-bottom: 18px;
+    }
+
+    .application-benefits {
+        grid-template-columns: 1fr;
+    }
+
+    .application-benefit,
+    .application-benefit:first-child,
+    .application-benefit:last-child {
+        border: 1px solid #e1e1e1;
+
+        border-radius: 5px;
+
+        margin-bottom: 8px;
+    }
+
+    .application-benefit::after {
+        display: none;
+    }
+
+}
+
+
+@media (max-width: 500px) {
+
+    .applications-container {
+        padding: 12px;
+    }
+
+    .applications-banner {
+        padding: 20px 15px;
+    }
+
+    .applications-banner-left h1 {
+        font-size: 27px;
+    }
+
+    .applications-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .application-image-box {
+        height: 190px;
+    }
+
+    .application-benefits {
+        padding: 8px 12px 12px;
+    }
+
+}

@@ -1,0 +1,65 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Category {
+  id   BigInt @id @default(autoincrement())
+  name String
+
+  @@map("categories")
+}
+
+model Brand {
+  id      BigInt   @id @default(autoincrement())
+  name    String?
+  logoUrl String?  @map("logo_url")
+  status  Boolean? @default(true)
+
+  @@map("brands")
+}
+
+model Product {
+  id            BigInt    @id @default(autoincrement())
+  model         String?
+  name          String?
+  category      String?
+  description   String?
+  brandImageUrl String?   @map("brand_image_url")
+  imageUrl      String?   @map("image_url")
+  pdfUrl        String?   @map("pdf_url")
+  features      String?
+  status        Boolean?  @default(true)
+  createdAt     DateTime? @default(now()) @map("created_at")
+  updatedAt     DateTime? @updatedAt @map("updated_at")
+
+  @@map("products")
+}
+
+model Enquiry {
+  id           BigInt    @id @default(autoincrement())
+  customerName String?   @map("customer_name")
+  companyName  String?   @map("company_name")
+  phone        String?
+  email        String?
+  productId    BigInt?   @map("product_id")
+  message      String?
+  status       String?   @default("NEW")
+  createdAt    DateTime? @default(now()) @map("created_at")
+
+  @@map("enquiries")
+}
+
+model Admin {
+  id       BigInt   @id @default(autoincrement())
+  username String   @unique
+  password String
+  enabled  Boolean? @default(true)
+
+  @@map("admins")
+}
