@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import "@/styles/productdetails.css";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+const PRODUCT_PLACEHOLDER = "https://res.cloudinary.com/hehl57yx/image/upload/v1790498287/weighing-balance/media/cqockatjkpzj8a1xqriq.png";
 
 
 /* =========================================================
@@ -1047,7 +1048,7 @@ const ProductDetails = () => {
 
         const productImage =
             product.imageUrl ||
-            "/images/product-placeholder.png";
+            PRODUCT_PLACEHOLDER;
 
         const seoTitle =
             `${product.name}${product.model ? ` ${product.model}` : ""} | Weighing Balance Bangalore`;
@@ -1411,7 +1412,7 @@ const ProductDetails = () => {
 
     const productImage =
         product.imageUrl ||
-        "/images/product-placeholder.png";
+        PRODUCT_PLACEHOLDER;
 
 
     /* =====================================================
@@ -1496,7 +1497,7 @@ const ProductDetails = () => {
                             alt={`${product.name} ${product.model || ""} weighing balance in Bangalore`}
                             onError={(event) => {
                                 event.currentTarget.src =
-                                    "/images/product-placeholder.png";
+                                    PRODUCT_PLACEHOLDER;
                             }}
                         />
 

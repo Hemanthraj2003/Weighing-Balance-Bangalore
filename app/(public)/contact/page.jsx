@@ -271,7 +271,7 @@ ${formData.message}
                 <div className="contact-banner-image">
 
                     <img
-                        src="/images/contact/contact-weighing-balances.png"
+                        src="https://res.cloudinary.com/hehl57yx/image/upload/v1790606198/weighing-balance/media/contact-weighing-balances.png"
                         alt="Weighing Balance Bangalore"
                     />
 
@@ -733,7 +733,7 @@ ${formData.message}
                             <div className="office-image">
 
                                 <img
-                                    src="/images/contact/contact-side-image.png"
+                                    src="https://res.cloudinary.com/hehl57yx/image/upload/v1790606199/weighing-balance/media/contact-side-image.png"
                                     alt="Weighing Balance Bangalore office"
                                 />
 
