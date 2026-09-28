@@ -1,68 +1,206 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import "@/styles/products.css";
 
 const API_URL = "/api";
 const WENSAR_LOGO = "https://res.cloudinary.com/hehl57yx/image/upload/v1790498287/weighing-balance/media/cqockatjkpzj8a1xqriq.png";
+const LIMIT = 10;
 
 const Products = () => {
-
     const [products, setProducts] = useState([]);
+    const [categoriesList, setCategoriesList] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
     const [error, setError] = useState("");
 
+    // Pagination
+    const [page, setPage] = useState(1);
+    const [totalProducts, setTotalProducts] = useState(0);
+    const [totalPages, setTotalPages] = useState(1);
+    const [hasMore, setHasMore] = useState(false);
+
+    // Filters
     const [selectedCategory, setSelectedCategory] = useState("all");
     const [selectedReadability, setSelectedReadability] = useState([]);
     const [selectedCapacity, setSelectedCapacity] = useState([]);
     const [sortBy, setSortBy] = useState("popularity");
 
-    // SEARCH
+    // Search
+    const [searchInput, setSearchInput] = useState("");
     const [searchTerm, setSearchTerm] = useState("");
 
-    /* =========================================================
-       LOAD PRODUCTS
-    ========================================================= */
+    // In-memory page cache ref: cacheKey -> { products, total, totalPages, hasMore }
+    const cacheRef = useRef(new Map());
 
+    // Helper: prefetch / pre-cache images in browser HTTP cache
+    const prefetchImages = (items) => {
+        if (typeof window === "undefined" || !Array.isArray(items)) return;
+        items.forEach((item) => {
+            if (item.imageUrl) {
+                const img = new Image();
+                img.src = item.imageUrl;
+            }
+            if (item.brandImageUrl) {
+                const brandImg = new Image();
+                brandImg.src = item.brandImageUrl;
+            }
+        });
+    };
+
+    // Helper: read from in-memory cache or sessionStorage
+    const getCachedData = (key) => {
+        if (cacheRef.current.has(key)) {
+            return cacheRef.current.get(key);
+        }
+        if (typeof window !== "undefined") {
+            try {
+                const item = sessionStorage.getItem(`wb_cache_${key}`);
+                if (item) {
+                    const parsed = JSON.parse(item);
+                    cacheRef.current.set(key, parsed);
+                    return parsed;
+                }
+            } catch (e) {}
+        }
+        return null;
+    };
+
+    // Helper: write to in-memory cache and sessionStorage
+    const setCachedData = (key, data) => {
+        cacheRef.current.set(key, data);
+        if (typeof window !== "undefined") {
+            try {
+                sessionStorage.setItem(`wb_cache_${key}`, JSON.stringify(data));
+            } catch (e) {}
+        }
+    };
+
+    // Debounce search input (350ms)
     useEffect(() => {
+        const handler = setTimeout(() => {
+            setSearchTerm(searchInput);
+        }, 350);
+        return () => clearTimeout(handler);
+    }, [searchInput]);
 
-        fetch(`${API_URL}/products`)
-            .then((response) => {
+    // Fetch all categories for sidebar on mount
+    useEffect(() => {
+        const cachedCats = getCachedData("all_categories");
+        if (cachedCats) {
+            setCategoriesList(cachedCats);
+        } else {
+            fetch(`${API_URL}/categories`)
+                .then((res) => (res.ok ? res.json() : []))
+                .then((data) => {
+                    if (Array.isArray(data)) {
+                        setCategoriesList(data);
+                        setCachedData("all_categories", data);
+                    }
+                })
+                .catch((err) => console.error("Categories fetch error:", err));
+        }
+    }, []);
 
+    // Core fetch function with caching & pagination
+    const fetchProducts = useCallback(
+        async (targetPage, isLoadMore = false) => {
+            if (isLoadMore) {
+                setLoadingMore(true);
+            } else {
+                setLoading(true);
+            }
+            setError("");
+
+            const cacheKey = `${selectedCategory}_${searchTerm.trim().toLowerCase()}_p${targetPage}`;
+            const cached = getCachedData(cacheKey);
+
+            if (cached) {
+                if (isLoadMore) {
+                    setProducts((prev) => {
+                        const existingIds = new Set(prev.map((p) => p.id));
+                        const newItems = cached.products.filter((p) => !existingIds.has(p.id));
+                        return [...prev, ...newItems];
+                    });
+                } else {
+                    setProducts(cached.products);
+                }
+                setTotalProducts(cached.total);
+                setTotalPages(cached.totalPages);
+                setHasMore(cached.hasMore);
+                setPage(targetPage);
+                prefetchImages(cached.products);
+                setLoading(false);
+                setLoadingMore(false);
+                return;
+            }
+
+            try {
+                const params = new URLSearchParams({
+                    page: String(targetPage),
+                    limit: String(LIMIT),
+                });
+                if (selectedCategory && selectedCategory !== "all") {
+                    params.set("category", selectedCategory);
+                }
+                if (searchTerm.trim()) {
+                    params.set("search", searchTerm.trim());
+                }
+
+                const response = await fetch(`${API_URL}/products?${params.toString()}`);
                 if (!response.ok) {
                     throw new Error("Failed to load products");
                 }
 
-                return response.json();
-            })
-            .then((data) => {
+                const data = await response.json();
+                const fetchedProducts = Array.isArray(data) ? data : data.products || [];
+                const total = data.total ?? fetchedProducts.length;
+                const tPages = data.totalPages ?? Math.ceil(total / LIMIT);
+                const more = data.hasMore ?? targetPage < tPages;
 
-                console.log("PRODUCTS FROM DATABASE:", data);
+                const resultToCache = {
+                    products: fetchedProducts,
+                    total,
+                    totalPages: tPages,
+                    hasMore: more,
+                };
+                setCachedData(cacheKey, resultToCache);
+                prefetchImages(fetchedProducts);
 
-                setProducts(
-                    Array.isArray(data) ? data : []
-                );
-
-                setLoading(false);
-            })
-            .catch((error) => {
-
-                console.error("Product API Error:", error);
-
+                if (isLoadMore) {
+                    setProducts((prev) => {
+                        const existingIds = new Set(prev.map((p) => p.id));
+                        const newItems = fetchedProducts.filter((p) => !existingIds.has(p.id));
+                        return [...prev, ...newItems];
+                    });
+                } else {
+                    setProducts(fetchedProducts);
+                }
+                setTotalProducts(total);
+                setTotalPages(tPages);
+                setHasMore(more);
+                setPage(targetPage);
+            } catch (err) {
+                console.error("Product API Error:", err);
                 setError("Unable to load products.");
-
+            } finally {
                 setLoading(false);
-            });
+                setLoadingMore(false);
+            }
+        },
+        [selectedCategory, searchTerm]
+    );
 
-    }, []);
+    // Re-fetch page 1 when category or search changes
+    useEffect(() => {
+        fetchProducts(1, false);
+    }, [fetchProducts]);
 
     /* =========================================================
        GET PRODUCT FEATURE VALUE
     ========================================================= */
-
     const getFeatureValue = (product, label) => {
-
         const directKey = label.toLowerCase();
 
         if (
@@ -76,7 +214,6 @@ const Products = () => {
         let features = product.features;
 
         if (typeof features === "string") {
-
             features = features
                 .split("|")
                 .map((item) => item.trim())
@@ -84,9 +221,7 @@ const Products = () => {
         }
 
         if (Array.isArray(features)) {
-
             const feature = features.find((item) => {
-
                 if (typeof item !== "string") {
                     return false;
                 }
@@ -98,7 +233,6 @@ const Products = () => {
             });
 
             if (feature) {
-
                 return feature
                     .split(":")
                     .slice(1)
@@ -113,9 +247,7 @@ const Products = () => {
     /* =========================================================
        CHECK VALID VALUE
     ========================================================= */
-
     const hasValidValue = (value) => {
-
         if (value === undefined || value === null) {
             return false;
         }
@@ -126,10 +258,7 @@ const Products = () => {
             return false;
         }
 
-        if (
-            cleanedValue.toLowerCase() ===
-            "not specified"
-        ) {
+        if (cleanedValue.toLowerCase() === "not specified") {
             return false;
         }
 
@@ -138,93 +267,39 @@ const Products = () => {
 
     /* =========================================================
        CATEGORY HELPERS
-
-       DISPLAY NAMES ONLY
-
-       Database values are NOT changed.
     ========================================================= */
-
     const getCategoryName = (product) => {
-
         const category =
             product.categoryName ||
             product.category ||
             "Other Products";
 
-        const normalized =
-            String(category)
-                .trim()
-                .toLowerCase();
-
-        /* ---------------------------------------------
-           ANALYTICAL BALANCES
-        --------------------------------------------- */
+        const normalized = String(category).trim().toLowerCase();
 
         if (normalized === "analytical balances") {
             return "Analytical Weighing Balances";
         }
-
-        /* ---------------------------------------------
-           SEMI MICRO BALANCES
-        --------------------------------------------- */
-
         if (normalized === "semi micro balances") {
             return "Semi Micro Weighing Balances";
         }
-
-        /* ---------------------------------------------
-           PRECISION BALANCES
-        --------------------------------------------- */
-
         if (normalized === "precision balances") {
             return "Precision Weighing Balances";
         }
-
-        /* ---------------------------------------------
-           TABLE TOP BALANCES
-        --------------------------------------------- */
-
         if (
             normalized === "table top balances" ||
             normalized === "tabletop balances"
         ) {
             return "Table Top Weighing Balances";
         }
-
-        /* ---------------------------------------------
-           PLATFORM BALANCES
-        --------------------------------------------- */
-
         if (normalized === "platform balances") {
             return "Platform Weighing Balances";
         }
-
-        /* ---------------------------------------------
-           HIGH PRECISION BALANCES
-        --------------------------------------------- */
-
-        if (
-            normalized ===
-            "high precision balances"
-        ) {
+        if (normalized === "high precision balances") {
             return "High Precision Weighing Balances";
         }
-
-        /* ---------------------------------------------
-           DENSITY / MICRO BALANCE
-        --------------------------------------------- */
-
-        if (
-            normalized ===
-            "density balance / micro balance"
-        ) {
+        if (normalized === "density balance / micro balance") {
             return "Density Weighing Balance / Micro Weighing Balance";
         }
-
-        /* ---------------------------------------------
-           OTHER CATEGORIES
-        --------------------------------------------- */
-
         if (normalized === "moisture analyzers") {
             return "Moisture Analyzers";
         }
@@ -232,128 +307,64 @@ const Products = () => {
         return String(category).trim();
     };
 
-    /* =========================================================
-       CATEGORY VALUE
-
-       Used for filtering.
-
-       Original database value is preserved.
-    ========================================================= */
-
     const getCategoryValue = (product) => {
-
-        return (
-            product.category ||
-            "Other Products"
-        );
+        return product.category || "Other Products";
     };
 
-    /* =========================================================
-       CATEGORY ICONS
-    ========================================================= */
-
     const getCategoryIcon = (categoryName) => {
+        const name = String(categoryName).toLowerCase();
 
-        const name =
-            String(categoryName).toLowerCase();
-
-        if (name.includes("analytical")) {
-            return "⚖";
-        }
-
-        if (name.includes("precision")) {
-            return "⚖";
-        }
-
-        if (name.includes("micro")) {
-            return "◉";
-        }
-
-        if (name.includes("moisture")) {
-            return "♨";
-        }
-
-        if (name.includes("table")) {
-            return "▣";
-        }
-
-        if (name.includes("platform")) {
-            return "▤";
-        }
-
-        if (name.includes("printer")) {
-            return "▤";
-        }
-
-        if (name.includes("density")) {
-            return "◉";
-        }
-
-        if (name.includes("gsm")) {
-            return "◉";
-        }
-
-        if (name.includes("weight")) {
-            return "⚖";
-        }
-
-        if (name.includes("ionizer")) {
-            return "⚡";
-        }
-
-        if (name.includes("pad")) {
-            return "◫";
-        }
-
-        if (name.includes("display")) {
-            return "▤";
-        }
-
-        if (name.includes("kit")) {
-            return "⚙";
-        }
-
-        if (name.includes("accessor")) {
-            return "⚙";
-        }
+        if (name.includes("analytical")) return "⚖";
+        if (name.includes("precision")) return "⚖";
+        if (name.includes("micro")) return "◉";
+        if (name.includes("moisture")) return "♨";
+        if (name.includes("table")) return "▣";
+        if (name.includes("platform")) return "▤";
+        if (name.includes("printer")) return "▤";
+        if (name.includes("density")) return "◉";
+        if (name.includes("gsm")) return "◉";
+        if (name.includes("weight")) return "⚖";
+        if (name.includes("ionizer")) return "⚡";
+        if (name.includes("pad")) return "◫";
+        if (name.includes("display")) return "▤";
+        if (name.includes("kit")) return "⚙";
+        if (name.includes("accessor")) return "⚙";
 
         return "⚙";
     };
 
     /* =========================================================
-       CREATE PRODUCT CATEGORIES
-
-       Analytical Balances
-       analytical balances
-
-       become ONE category.
+       CREATE PRODUCT CATEGORIES FOR SIDEBAR
     ========================================================= */
-
     const categoryMap = new Map();
 
-    products.forEach((product) => {
-
-        const originalCategory =
-            getCategoryValue(product);
-
-        const categoryId =
-            String(originalCategory)
-                .trim()
-                .toLowerCase();
-
-        const name =
-            getCategoryName(product);
+    // 1. Populate all categories from DB categories API
+    categoriesList.forEach((cat) => {
+        const rawName = cat.name || cat;
+        const categoryId = String(rawName).trim().toLowerCase();
+        const displayName = getCategoryName({ category: rawName });
 
         if (!categoryMap.has(categoryId)) {
+            categoryMap.set(categoryId, {
+                id: categoryId,
+                name: displayName,
+                icon: getCategoryIcon(displayName),
+            });
+        }
+    });
 
-            categoryMap.set(
-                categoryId,
-                {
-                    id: categoryId,
-                    name: name,
-                    icon: getCategoryIcon(name),
-                }
-            );
+    // 2. Also incorporate any categories from loaded products
+    products.forEach((product) => {
+        const originalCategory = getCategoryValue(product);
+        const categoryId = String(originalCategory).trim().toLowerCase();
+        const name = getCategoryName(product);
+
+        if (!categoryMap.has(categoryId)) {
+            categoryMap.set(categoryId, {
+                id: categoryId,
+                name: name,
+                icon: getCategoryIcon(name),
+            });
         }
     });
 
@@ -367,906 +378,565 @@ const Products = () => {
     ];
 
     /* =========================================================
-       FILTER OPTIONS
+       FILTER OPTIONS (Readability & Capacity)
     ========================================================= */
-
     const readabilityOptions = [
         ...new Set(
             products
-                .map((product) =>
-                    getFeatureValue(
-                        product,
-                        "Readability"
-                    )
-                )
-                .filter((value) =>
-                    hasValidValue(value)
-                )
+                .map((product) => getFeatureValue(product, "Readability"))
+                .filter((value) => hasValidValue(value))
         ),
     ];
 
     const capacityOptions = [
         ...new Set(
             products
-                .map((product) =>
-                    getFeatureValue(
-                        product,
-                        "Capacity"
-                    )
-                )
-                .filter((value) =>
-                    hasValidValue(value)
-                )
+                .map((product) => getFeatureValue(product, "Capacity"))
+                .filter((value) => hasValidValue(value))
         ),
     ];
 
-    /* =========================================================
-       TOGGLE READABILITY
-    ========================================================= */
-
     const toggleReadability = (value) => {
-
         setSelectedReadability((previous) => {
-
             if (previous.includes(value)) {
-
-                return previous.filter(
-                    (item) => item !== value
-                );
+                return previous.filter((item) => item !== value);
             }
-
-            return [
-                ...previous,
-                value,
-            ];
+            return [...previous, value];
         });
     };
-
-    /* =========================================================
-       TOGGLE CAPACITY
-    ========================================================= */
 
     const toggleCapacity = (value) => {
-
         setSelectedCapacity((previous) => {
-
             if (previous.includes(value)) {
-
-                return previous.filter(
-                    (item) => item !== value
-                );
+                return previous.filter((item) => item !== value);
             }
-
-            return [
-                ...previous,
-                value,
-            ];
+            return [...previous, value];
         });
     };
 
-    /* =========================================================
-       CLEAR FILTERS
-
-       ALSO CLEARS SEARCH
-    ========================================================= */
-
     const clearFilters = () => {
-
         setSelectedCategory("all");
         setSelectedReadability([]);
         setSelectedCapacity([]);
         setSortBy("popularity");
+        setSearchInput("");
         setSearchTerm("");
     };
-
-    /* =========================================================
-       SELECTED CATEGORY NAME
-    ========================================================= */
 
     const selectedCategoryName =
         selectedCategory === "all"
             ? "All Products"
-            : categories.find(
-                (category) =>
-                    category.id === selectedCategory
-            )?.name || "Products";
+            : categories.find((c) => c.id === selectedCategory)?.name || "Products";
 
     /* =========================================================
-       FILTER PRODUCTS
+       FILTER LOADED PRODUCTS BY CAPACITY & READABILITY
     ========================================================= */
+    let filteredProducts = products.filter((product) => {
+        const productReadability = getFeatureValue(product, "Readability");
+        const productCapacity = getFeatureValue(product, "Capacity");
 
-    let filteredProducts =
-        products.filter((product) => {
+        const readabilityMatch =
+            selectedReadability.length === 0 ||
+            selectedReadability.includes(productReadability);
 
-            /* ---------------------------------------------
-               CATEGORY
-            --------------------------------------------- */
+        const capacityMatch =
+            selectedCapacity.length === 0 ||
+            selectedCapacity.includes(productCapacity);
 
-            const productCategory =
-                String(
-                    getCategoryValue(product)
-                )
-                    .trim()
-                    .toLowerCase();
-
-            /* ---------------------------------------------
-               READABILITY
-            --------------------------------------------- */
-
-            const productReadability =
-                getFeatureValue(
-                    product,
-                    "Readability"
-                );
-
-            /* ---------------------------------------------
-               CAPACITY
-            --------------------------------------------- */
-
-            const productCapacity =
-                getFeatureValue(
-                    product,
-                    "Capacity"
-                );
-
-            /* ---------------------------------------------
-               CATEGORY MATCH
-            --------------------------------------------- */
-
-            const categoryMatch =
-                selectedCategory === "all" ||
-                productCategory === selectedCategory;
-
-            /* ---------------------------------------------
-               READABILITY MATCH
-            --------------------------------------------- */
-
-            const readabilityMatch =
-                selectedReadability.length === 0 ||
-                selectedReadability.includes(
-                    productReadability
-                );
-
-            /* ---------------------------------------------
-               CAPACITY MATCH
-            --------------------------------------------- */
-
-            const capacityMatch =
-                selectedCapacity.length === 0 ||
-                selectedCapacity.includes(
-                    productCapacity
-                );
-
-            /* ---------------------------------------------
-               SEARCH MATCH
-
-               Searches:
-               - Product Name
-               - Model
-               - Category
-            --------------------------------------------- */
-
-            const searchValue =
-                searchTerm
-                    .trim()
-                    .toLowerCase();
-
-            const productName =
-                String(
-                    product.name || ""
-                ).toLowerCase();
-
-            const productModel =
-                String(
-                    product.model || ""
-                ).toLowerCase();
-
-            const productCategoryName =
-                String(
-                    getCategoryName(product) || ""
-                ).toLowerCase();
-
-            const searchMatch =
-                !searchValue ||
-                productName.includes(searchValue) ||
-                productModel.includes(searchValue) ||
-                productCategoryName.includes(searchValue);
-
-            /* ---------------------------------------------
-               FINAL MATCH
-            --------------------------------------------- */
-
-            return (
-                categoryMatch &&
-                readabilityMatch &&
-                capacityMatch &&
-                searchMatch
-            );
-        });
+        return readabilityMatch && capacityMatch;
+    });
 
     /* =========================================================
        SORT PRODUCTS
     ========================================================= */
-
     if (sortBy === "name-asc") {
-
-        filteredProducts = [
-            ...filteredProducts,
-        ].sort(
-            (a, b) =>
-                (
-                    a.name ||
-                    a.model ||
-                    ""
-                ).localeCompare(
-                    b.name ||
-                    b.model ||
-                    ""
-                )
+        filteredProducts = [...filteredProducts].sort((a, b) =>
+            (a.name || a.model || "").localeCompare(b.name || b.model || "")
         );
     }
 
     if (sortBy === "name-desc") {
-
-        filteredProducts = [
-            ...filteredProducts,
-        ].sort(
-            (a, b) =>
-                (
-                    b.name ||
-                    b.model ||
-                    ""
-                ).localeCompare(
-                    a.name ||
-                    a.model ||
-                    ""
-                )
+        filteredProducts = [...filteredProducts].sort((a, b) =>
+            (b.name || b.model || "").localeCompare(a.name || a.model || "")
         );
     }
 
     /* =========================================================
-       LOADING
+       PAGINATION HANDLERS
     ========================================================= */
+    const handleLoadMore = () => {
+        if (!loadingMore && hasMore) {
+            fetchProducts(page + 1, true);
+        }
+    };
 
-    if (loading) {
+    const handleGoToPage = (targetPage) => {
+        if (targetPage >= 1 && targetPage <= totalPages && targetPage !== page) {
+            fetchProducts(targetPage, false);
+            const element = document.querySelector(".products-content");
+            if (element) {
+                element.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+        }
+    };
 
+    /* =========================================================
+       INITIAL LOADING STATE
+    ========================================================= */
+    if (loading && products.length === 0) {
         return (
             <div className="products-page">
-
-                <div className="no-products">
-
-                    <h2>
-                        Loading Products...
-                    </h2>
-
-                    <p>
-                        Please wait while we
-                        load our products.
-                    </p>
-
+                <div
+                    className="no-products product-card glass-card"
+                    style={{ maxWidth: "550px", margin: "100px auto", padding: "60px 30px" }}
+                >
+                    <div style={{ fontSize: "40px", marginBottom: "15px" }}>⚖</div>
+                    <h2>Loading Products...</h2>
+                    <p>Please wait while we load our high-precision weighing balances.</p>
                 </div>
-
             </div>
         );
     }
 
     /* =========================================================
-       ERROR
+       ERROR STATE
     ========================================================= */
-
-    if (error) {
-
+    if (error && products.length === 0) {
         return (
             <div className="products-page">
-
                 <div className="no-products">
-
-                    <h2>
-                        Unable to Load Products
-                    </h2>
-
-                    <p>
-                        {error}
-                    </p>
-
-                    <button
-                        onClick={() =>
-                            window.location.reload()
-                        }
-                    >
-                        Try Again
-                    </button>
-
+                    <h2>Unable to Load Products</h2>
+                    <p>{error}</p>
+                    <button onClick={() => fetchProducts(1, false)}>Try Again</button>
                 </div>
-
             </div>
         );
     }
 
     /* =========================================================
-       PAGE
+       MAIN RENDER
     ========================================================= */
-
     return (
-
         <div className="products-page">
-
             {/* TOP BANNER */}
-
             <section className="products-banner">
-
                 <div className="products-banner-left">
-
-                    <h1>
-                        {selectedCategoryName}
-                    </h1>
-
+                    <h1>{selectedCategoryName}</h1>
                     <p className="breadcrumb">
-
                         Home
-
-                        <span>
-                            /
-                        </span>
-
+                        <span>/</span>
                         Products
-
                         {selectedCategory !== "all" && (
                             <>
-
-                                <span>
-                                    /
-                                </span>
-
+                                <span>/</span>
                                 {selectedCategoryName}
-
                             </>
                         )}
-
                     </p>
-
                 </div>
 
                 <div className="products-banner-right">
-
-                    <div className="banner-icon">
-                        ⚖
-                    </div>
-
+                    <div className="banner-icon">⚖</div>
                     <div>
-
-                        <h3>
-                            High Precision | Accurate | Reliable
-                        </h3>
-
-                        <p>
-                            Professional laboratory
-                            and industrial weighing
-                            solutions
-                        </p>
-
+                        <h3>High Precision | Accurate | Reliable</h3>
+                        <p>Professional laboratory and industrial weighing solutions</p>
                     </div>
-
                 </div>
-
             </section>
 
             {/* MAIN PRODUCTS AREA */}
-
             <section className="products-layout">
-
                 {/* SIDEBAR */}
-
                 <aside className="products-sidebar">
-
                     {/* PRODUCT CATEGORIES */}
-
                     <div className="sidebar-box">
-
-                        <h2>
-                            PRODUCT CATEGORIES
-                        </h2>
-
-                        {categories.map(
-                            (category) => (
-
-                                <button
-                                    key={category.id}
-                                    className={
-                                        `category-item ${
-                                            selectedCategory ===
-                                            category.id
-                                                ? "active-category"
-                                                : ""
-                                        }`
-                                    }
-                                    onClick={() => {
-
-                                        setSelectedCategory(
-                                            category.id
-                                        );
-
-                                    }}
-                                >
-
-                                    <span className="category-icon">
-
-                                        {category.icon}
-
-                                    </span>
-
-                                    <span>
-                                        {category.name}
-                                    </span>
-
-                                </button>
-
-                            )
-                        )}
-
+                        <h2>PRODUCT CATEGORIES</h2>
+                        {categories.map((category) => (
+                            <button
+                                key={category.id}
+                                className={`category-item ${
+                                    selectedCategory === category.id ? "active-category" : ""
+                                }`}
+                                onClick={() => {
+                                    setSelectedCategory(category.id);
+                                }}
+                            >
+                                <span className="category-icon">{category.icon}</span>
+                                <span>{category.name}</span>
+                            </button>
+                        ))}
                     </div>
 
                     {/* FILTER BOX */}
-
                     <div className="sidebar-box filter-box">
-
-                        <h2>
-                            FILTER BY
-                        </h2>
+                        <h2>FILTER BY</h2>
 
                         {/* READABILITY */}
-
-                        <h3>
-                            Readability
-                        </h3>
-
-                        <div className="filter-options">
-
-                            {readabilityOptions.map(
-                                (value) => (
-
-                                    <label key={value}>
-
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedReadability.includes(
-                                                value
-                                            )}
-                                            onChange={() =>
-                                                toggleReadability(
-                                                    value
-                                                )
-                                            }
-                                        />
-
-                                        <span>
-                                            {value}
-                                        </span>
-
-                                    </label>
-
-                                )
-                            )}
-
-                        </div>
+                        {readabilityOptions.length > 0 && (
+                            <>
+                                <h3>Readability</h3>
+                                <div className="filter-options">
+                                    {readabilityOptions.map((value) => (
+                                        <label key={value}>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedReadability.includes(value)}
+                                                onChange={() => toggleReadability(value)}
+                                            />
+                                            <span>{value}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </>
+                        )}
 
                         {/* CAPACITY */}
-
-                        <h3 className="capacity-heading">
-                            Capacity
-                        </h3>
-
-                        <div className="filter-options">
-
-                            {capacityOptions.map(
-                                (value) => (
-
-                                    <label key={value}>
-
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedCapacity.includes(
-                                                value
-                                            )}
-                                            onChange={() =>
-                                                toggleCapacity(
-                                                    value
-                                                )
-                                            }
-                                        />
-
-                                        <span>
-                                            {value}
-                                        </span>
-
-                                    </label>
-
-                                )
-                            )}
-
-                        </div>
+                        {capacityOptions.length > 0 && (
+                            <>
+                                <h3 className="capacity-heading">Capacity</h3>
+                                <div className="filter-options">
+                                    {capacityOptions.map((value) => (
+                                        <label key={value}>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedCapacity.includes(value)}
+                                                onChange={() => toggleCapacity(value)}
+                                            />
+                                            <span>{value}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </>
+                        )}
 
                         {/* CLEAR FILTERS */}
-
-                        <button
-                            className="clear-filters-btn"
-                            onClick={clearFilters}
-                        >
+                        <button className="clear-filters-btn" onClick={clearFilters}>
                             ↻ Clear Filters
                         </button>
-
                     </div>
-
                 </aside>
 
                 {/* PRODUCTS CONTENT */}
-
                 <main className="products-content">
-
                     {/* PRODUCTS TOOLBAR */}
-
                     <div className="products-toolbar">
-
                         <p>
-
                             Showing{" "}
-
-                            {
-                                filteredProducts.length > 0
-                                    ? `1–${filteredProducts.length}`
-                                    : "0"
-                            }{" "}
-
-                            of{" "}
-
-                            {filteredProducts.length}{" "}
-
-                            results
-
+                            <strong>
+                                {products.length > 0 ? `1–${products.length}` : "0"}
+                            </strong>{" "}
+                            of <strong>{totalProducts || products.length}</strong> results
                         </p>
 
                         {/* SEARCH */}
-
                         <div className="product-search">
-
                             <input
                                 type="text"
                                 placeholder="Search products..."
-                                value={searchTerm}
-                                onChange={(event) =>
-                                    setSearchTerm(
-                                        event.target.value
-                                    )
-                                }
+                                value={searchInput}
+                                onChange={(event) => setSearchInput(event.target.value)}
                             />
-
                         </div>
 
                         {/* SORT */}
-
                         <div className="sort-area">
-
-                            <span>
-                                Sort by:
-                            </span>
-
+                            <span>Sort by:</span>
                             <select
                                 value={sortBy}
-                                onChange={(event) =>
-                                    setSortBy(
-                                        event.target.value
-                                    )
-                                }
+                                onChange={(event) => setSortBy(event.target.value)}
                             >
-
-                                <option value="popularity">
-                                    Popularity
-                                </option>
-
-                                <option value="name-asc">
-                                    Name: A-Z
-                                </option>
-
-                                <option value="name-desc">
-                                    Name: Z-A
-                                </option>
-
+                                <option value="popularity">Popularity</option>
+                                <option value="name-asc">Name: A-Z</option>
+                                <option value="name-desc">Name: Z-A</option>
                             </select>
-
                         </div>
-
                     </div>
 
                     {/* PRODUCT GRID */}
-
                     {filteredProducts.length > 0 ? (
-
-                        <div className="products-grid">
-
-                            {filteredProducts.map(
-                                (product) => {
-
-                                    const capacity =
-                                        getFeatureValue(
-                                            product,
-                                            "Capacity"
-                                        );
-
-                                    const readability =
-                                        getFeatureValue(
-                                            product,
-                                            "Readability"
-                                        );
-
-                                    const productName =
-                                        product.name ||
-                                        "Product";
-
-                                    const model =
-                                        hasValidValue(
-                                            product.model
-                                        )
-                                            ? product.model
-                                            : "";
-
-                                    const category =
-                                        getCategoryName(
-                                            product
-                                        );
+                        <>
+                            <div className="products-grid">
+                                {filteredProducts.map((product) => {
+                                    const capacity = getFeatureValue(product, "Capacity");
+                                    const readability = getFeatureValue(product, "Readability");
+                                    const productName = product.name || "Product";
+                                    const model = hasValidValue(product.model)
+                                        ? product.model
+                                        : "";
+                                    const category = getCategoryName(product);
 
                                     return (
-
                                         <article
-                                            className="product-card"
+                                            className="product-card glass-card"
                                             key={product.id}
                                         >
-
                                             {/* BRAND IMAGE */}
-
                                             <div className="product-brand-logo">
-
                                                 <img
-                                                    src={
-                                                        product.brandImageUrl ||
-                                                        WENSAR_LOGO
-                                                    }
-                                                    alt={
-                                                        `${productName} brand`
-                                                    }
+                                                    src={product.brandImageUrl || WENSAR_LOGO}
+                                                    alt={`${productName} brand`}
+                                                    loading="lazy"
+                                                    decoding="async"
                                                     onError={(event) => {
-
                                                         if (
-                                                            event.currentTarget
-                                                                .dataset
-                                                                .fallback ===
-                                                            "true"
+                                                            event.currentTarget.dataset
+                                                                .fallback === "true"
                                                         ) {
-
                                                             event.currentTarget.style.display =
                                                                 "none";
-
                                                             return;
                                                         }
-
-                                                        event.currentTarget
-                                                            .dataset
-                                                            .fallback =
+                                                        event.currentTarget.dataset.fallback =
                                                             "true";
-
-                                                        event.currentTarget.src =
-                                                            WENSAR_LOGO;
-
+                                                        event.currentTarget.src = WENSAR_LOGO;
                                                     }}
                                                 />
-
                                             </div>
 
                                             {/* PRODUCT IMAGE */}
-
                                             <div className="product-image-box">
-
                                                 {product.imageUrl ? (
-
                                                     <img
-                                                        src={
-                                                            product.imageUrl
-                                                        }
-                                                        alt={
-                                                            `${productName}${
-                                                                model
-                                                                    ? ` - ${model}`
-                                                                    : ""
-                                                            }`
-                                                        }
+                                                        src={product.imageUrl}
+                                                        alt={`${productName}${
+                                                            model ? ` - ${model}` : ""
+                                                        }`}
+                                                        loading="lazy"
+                                                        decoding="async"
                                                         onError={(event) => {
-
                                                             event.currentTarget.style.display =
                                                                 "none";
-
                                                         }}
                                                     />
-
                                                 ) : (
-
                                                     <div className="product-image-placeholder">
-
                                                         No Product Image
-
                                                     </div>
-
                                                 )}
-
                                             </div>
 
                                             {/* PRODUCT INFORMATION */}
-
                                             <div className="product-card-content">
-
                                                 <div className="product-info">
-
                                                     {/* PRODUCT NAME */}
-
                                                     <div className="product-info-row">
-
                                                         <span className="product-info-label">
                                                             Product Name
                                                         </span>
-
                                                         <span className="product-info-value">
                                                             {productName}
                                                         </span>
-
                                                     </div>
 
                                                     {/* MODEL */}
-
-                                                    {hasValidValue(
-                                                        product.model
-                                                    ) && (
-
+                                                    {hasValidValue(product.model) && (
                                                         <div className="product-info-row">
-
                                                             <span className="product-info-label">
                                                                 Model
                                                             </span>
-
                                                             <span className="product-info-value">
                                                                 {product.model}
                                                             </span>
-
                                                         </div>
-
                                                     )}
 
                                                     {/* CAPACITY */}
-
-                                                    {hasValidValue(
-                                                        capacity
-                                                    ) && (
-
+                                                    {hasValidValue(capacity) && (
                                                         <div className="product-info-row">
-
                                                             <span className="product-info-label">
                                                                 Capacity
                                                             </span>
-
                                                             <span className="product-info-value">
                                                                 {capacity}
                                                             </span>
-
                                                         </div>
-
                                                     )}
 
                                                     {/* READABILITY */}
-
-                                                    {hasValidValue(
-                                                        readability
-                                                    ) && (
-
+                                                    {hasValidValue(readability) && (
                                                         <div className="product-info-row">
-
                                                             <span className="product-info-label">
                                                                 Readability
                                                             </span>
-
                                                             <span className="product-info-value">
                                                                 {readability}
                                                             </span>
-
                                                         </div>
-
                                                     )}
 
                                                     {/* CATEGORY */}
-
-                                                    {hasValidValue(
-                                                        category
-                                                    ) && (
-
+                                                    {hasValidValue(category) && (
                                                         <div className="product-info-row category-info-row">
-
                                                             <span className="product-info-label">
                                                                 Category
                                                             </span>
-
                                                             <span className="product-info-value">
                                                                 {category}
                                                             </span>
-
                                                         </div>
-
                                                     )}
-
                                                 </div>
 
                                                 {/* VIEW DETAILS */}
-
-                                                <Link href={`/products/${product.id}`}
+                                                <Link
+                                                    href={`/products/${product.id}`}
                                                     className="view-details-link"
                                                 >
-
                                                     View Details
-
-                                                    <span>
-                                                        →
-                                                    </span>
-
+                                                    <span>→</span>
                                                 </Link>
 
                                                 {/* REQUEST QUOTE */}
-
-                                                <Link href={
-                                                        `/contact?product=${encodeURIComponent(
-                                                            model ||
-                                                            productName
-                                                        )}`
-                                                    }
+                                                <Link
+                                                    href={`/contact?product=${encodeURIComponent(
+                                                        model || productName
+                                                    )}`}
                                                     className="quote-btn"
                                                 >
-
                                                     Get Contact / Request Quote
-
                                                 </Link>
-
                                             </div>
-
                                         </article>
-
                                     );
+                                })}
 
-                                }
+                                {/* SKELETON SHIMMER PLACEHOLDERS DURING LOAD MORE */}
+                                {loadingMore && (
+                                    <>
+                                        {[...Array(4)].map((_, i) => (
+                                            <div
+                                                key={`skeleton-${i}`}
+                                                className="product-card glass-card glass-skeleton"
+                                            >
+                                                <div className="skeleton-shimmer"></div>
+                                            </div>
+                                        ))}
+                                    </>
+                                )}
+                            </div>
+
+                            {/* PAGINATION & LOAD MORE CONTAINER */}
+                            {totalProducts > 0 && (
+                                <div className="pagination-container">
+                                    {/* Progress indicator */}
+                                    <div className="pagination-progress">
+                                        <span>
+                                            Showing <strong>{products.length}</strong> of{" "}
+                                            <strong>{totalProducts}</strong> products
+                                        </span>
+                                        <div className="progress-bar-bg">
+                                            <div
+                                                className="progress-bar-fill"
+                                                style={{
+                                                    width: `${Math.min(
+                                                        100,
+                                                        Math.round(
+                                                            (products.length / totalProducts) * 100
+                                                        )
+                                                    )}%`,
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Load More Button (On Demand) */}
+                                    {hasMore && (
+                                        <button
+                                            type="button"
+                                            className="load-more-btn"
+                                            onClick={handleLoadMore}
+                                            disabled={loadingMore}
+                                        >
+                                            {loadingMore ? (
+                                                <>⏳ Loading Next 10 Products...</>
+                                            ) : (
+                                                <>
+                                                    <span>⬇</span> Load Next 10 Products (
+                                                    {Math.min(10, totalProducts - products.length)}{" "}
+                                                    more)
+                                                </>
+                                            )}
+                                        </button>
+                                    )}
+
+                                    {/* Page navigation buttons */}
+                                    {totalPages > 1 && (
+                                        <div className="pagination-pages">
+                                            <button
+                                                type="button"
+                                                className="page-btn"
+                                                onClick={() => handleGoToPage(page - 1)}
+                                                disabled={page <= 1 || loadingMore || loading}
+                                                title="Previous Page"
+                                            >
+                                                ‹ Prev
+                                            </button>
+
+                                            {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                                .filter((p) => {
+                                                    return (
+                                                        p === 1 ||
+                                                        p === totalPages ||
+                                                        Math.abs(p - page) <= 2
+                                                    );
+                                                })
+                                                .map((p, idx, arr) => {
+                                                    const prevPageNum = arr[idx - 1];
+                                                    const showEllipsis =
+                                                        prevPageNum && p - prevPageNum > 1;
+                                                    return (
+                                                        <span
+                                                            key={p}
+                                                            style={{
+                                                                display: "inline-flex",
+                                                                alignItems: "center",
+                                                                gap: "6px",
+                                                            }}
+                                                        >
+                                                            {showEllipsis && (
+                                                                <span className="page-ellipsis">
+                                                                    …
+                                                                </span>
+                                                            )}
+                                                            <button
+                                                                type="button"
+                                                                className={`page-btn ${
+                                                                    page === p ? "active" : ""
+                                                                }`}
+                                                                onClick={() => handleGoToPage(p)}
+                                                                disabled={loadingMore || loading}
+                                                            >
+                                                                {p}
+                                                            </button>
+                                                        </span>
+                                                    );
+                                                })}
+
+                                            <button
+                                                type="button"
+                                                className="page-btn"
+                                                onClick={() => handleGoToPage(page + 1)}
+                                                disabled={
+                                                    page >= totalPages || loadingMore || loading
+                                                }
+                                                title="Next Page"
+                                            >
+                                                Next ›
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                             )}
-
-                        </div>
-
+                        </>
                     ) : (
-
                         <div className="no-products">
-
-                            <h2>
-                                No Products Found
-                            </h2>
-
-                            <p>
-                                Try clearing the filters or
-                                selecting another category.
-                            </p>
-
-                            <button
-                                onClick={clearFilters}
-                            >
-                                Clear Filters
-                            </button>
-
+                            <h2>No Products Found</h2>
+                            <p>Try clearing the filters or selecting another category.</p>
+                            <button onClick={clearFilters}>Clear Filters</button>
                         </div>
-
                     )}
-
                 </main>
-
             </section>
-
         </div>
     );
 };
