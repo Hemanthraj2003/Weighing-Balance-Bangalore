@@ -1,6 +1,11 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
-import products from "../../frontend/src/Data/products.mjs";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const prisma = new PrismaClient();
 
@@ -30,7 +35,17 @@ async function main() {
     console.log(`ℹ Admin user '${adminUsername}' already exists.`);
   }
 
-  // 2. Extract and Seed Unique Categories
+  // 2. Load Products Seed JSON
+  const seedFile = path.join(__dirname, "products_seed.json");
+  if (!fs.existsSync(seedFile)) {
+    console.log("⚠️ No products_seed.json found. Skipping products seed.");
+    return;
+  }
+
+  const products = JSON.parse(fs.readFileSync(seedFile, "utf8"));
+  console.log(`Loaded ${products.length} products from seed file.`);
+
+  // 3. Extract and Seed Unique Categories
   console.log("2. Seeding product categories...");
   const categoryNames = Array.from(
     new Set(
@@ -53,7 +68,21 @@ async function main() {
   }
   console.log(`✓ Categories seeded (${categoryNames.length} unique categories).`);
 
-  // 3. Seed Products
+  // 4. Seed Brand
+  const brandCount = await prisma.brand.count();
+  if (brandCount === 0) {
+    await prisma.brand.create({
+      data: {
+        id: 1n,
+        name: "WENSAR",
+        logoUrl: "https://res.cloudinary.com/hehl57yx/image/upload/v1790498287/weighing-balance/media/cqockatjkpzj8a1xqriq.png",
+        status: true,
+      },
+    });
+    console.log("✓ Brand WENSAR seeded.");
+  }
+
+  // 5. Seed Products
   console.log("3. Seeding products...");
   const existingProductCount = await prisma.product.count();
 
@@ -62,20 +91,20 @@ async function main() {
   } else {
     let count = 0;
     for (const p of products) {
-      const featuresStr = Array.isArray(p.features)
-        ? p.features.join(" | ")
-        : p.features || "";
-
       await prisma.product.create({
         data: {
+          id: BigInt(p.id),
           model: p.model || "",
           name: p.name || "",
           category: p.category || "",
           description: p.description || "",
-          imageUrl: p.image || null,
-          pdfUrl: p.pdf || null,
-          features: featuresStr,
-          status: true,
+          imageUrl: p.imageUrl || null,
+          pdfUrl: p.pdfUrl || null,
+          brandImageUrl: p.brandImageUrl || null,
+          features: p.features || null,
+          status: p.status !== false,
+          createdAt: p.createdAt ? new Date(p.createdAt) : new Date(),
+          updatedAt: p.updatedAt ? new Date(p.updatedAt) : new Date(),
         },
       });
       count++;
