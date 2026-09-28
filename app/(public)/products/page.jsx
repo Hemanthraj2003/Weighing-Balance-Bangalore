@@ -8,6 +8,72 @@ const API_URL = "/api";
 const WENSAR_LOGO = "https://res.cloudinary.com/hehl57yx/image/upload/v1790498287/weighing-balance/media/cqockatjkpzj8a1xqriq.png";
 const LIMIT = 10;
 
+/* =========================================================
+   GLASSCARD SKELETON PLACEHOLDER COMPONENT
+   Matches real product card layout, specs rows and buttons
+========================================================= */
+const ProductCardSkeleton = () => (
+    <article className="product-card glass-card glass-skeleton">
+        {/* Brand logo placeholder */}
+        <div className="product-brand-logo skeleton-box">
+            <div className="skeleton-line skeleton-brand-line" />
+        </div>
+
+        {/* Product image placeholder */}
+        <div className="product-image-box skeleton-box">
+            <div className="skeleton-image-placeholder">
+                <span className="skeleton-image-icon">⚖</span>
+            </div>
+        </div>
+
+        {/* Product info content placeholder */}
+        <div className="product-card-content">
+            <div className="product-info">
+                {/* Product Name */}
+                <div className="product-info-row skeleton-row">
+                    <span className="skeleton-line skeleton-label-line" style={{ width: "65%" }} />
+                    <span className="skeleton-line skeleton-value-line" style={{ width: "85%" }} />
+                </div>
+
+                {/* Model */}
+                <div className="product-info-row skeleton-row">
+                    <span className="skeleton-line skeleton-label-line" style={{ width: "45%" }} />
+                    <span className="skeleton-line skeleton-value-line" style={{ width: "60%" }} />
+                </div>
+
+                {/* Capacity */}
+                <div className="product-info-row skeleton-row">
+                    <span className="skeleton-line skeleton-label-line" style={{ width: "55%" }} />
+                    <span className="skeleton-line skeleton-value-line" style={{ width: "50%" }} />
+                </div>
+
+                {/* Readability */}
+                <div className="product-info-row skeleton-row">
+                    <span className="skeleton-line skeleton-label-line" style={{ width: "60%" }} />
+                    <span className="skeleton-line skeleton-value-line" style={{ width: "45%" }} />
+                </div>
+
+                {/* Category */}
+                <div className="product-info-row skeleton-row category-info-row">
+                    <span className="skeleton-line skeleton-label-line" style={{ width: "50%" }} />
+                    <span className="skeleton-line skeleton-value-line" style={{ width: "75%" }} />
+                </div>
+            </div>
+
+            {/* View Details button placeholder (matching red button) */}
+            <div className="view-details-link skeleton-btn skeleton-btn-red">
+                <span>View Details</span>
+                <span>→</span>
+            </div>
+
+            {/* Request Quote button placeholder (matching green button) */}
+            <div className="quote-btn skeleton-btn skeleton-btn-green">
+                <span>Get Contact / Request Quote</span>
+            </div>
+        </div>
+    </article>
+);
+
 const Products = () => {
     const [products, setProducts] = useState([]);
     const [categoriesList, setCategoriesList] = useState([]);
@@ -502,24 +568,6 @@ const Products = () => {
     }
 
     /* =========================================================
-       INITIAL LOADING STATE
-    ========================================================= */
-    if (loading && products.length === 0) {
-        return (
-            <div className="products-page">
-                <div
-                    className="no-products product-card glass-card"
-                    style={{ maxWidth: "550px", margin: "100px auto", padding: "60px 30px" }}
-                >
-                    <div style={{ fontSize: "40px", marginBottom: "15px" }}>⚖</div>
-                    <h2>Loading Products...</h2>
-                    <p>Please wait while we load our high-precision weighing balances.</p>
-                </div>
-            </div>
-        );
-    }
-
-    /* =========================================================
        ERROR STATE
     ========================================================= */
     if (error && products.length === 0) {
@@ -642,11 +690,19 @@ const Products = () => {
                     {/* PRODUCTS TOOLBAR */}
                     <div className="products-toolbar">
                         <p>
-                            Showing{" "}
-                            <strong>
-                                {filteredProducts.length > 0 ? `1–${filteredProducts.length}` : "0"}
-                            </strong>{" "}
-                            of <strong>{totalProducts || filteredProducts.length}</strong> results
+                            {loading && products.length === 0 ? (
+                                "Loading products..."
+                            ) : (
+                                <>
+                                    Showing{" "}
+                                    <strong>
+                                        {filteredProducts.length > 0
+                                            ? `1–${filteredProducts.length}`
+                                            : "0"}
+                                    </strong>{" "}
+                                    of <strong>{totalProducts || filteredProducts.length}</strong> results
+                                </>
+                            )}
                         </p>
 
                         {/* SEARCH */}
@@ -674,7 +730,14 @@ const Products = () => {
                     </div>
 
                     {/* PRODUCT GRID */}
-                    {filteredProducts.length > 0 ? (
+                    {loading && products.length === 0 ? (
+                        /* INITIAL SKELETON PLACEHOLDERS */
+                        <div className="products-grid">
+                            {[...Array(9)].map((_, i) => (
+                                <ProductCardSkeleton key={`init-skeleton-${i}`} />
+                            ))}
+                        </div>
+                    ) : filteredProducts.length > 0 ? (
                         <>
                             <div className="products-grid">
                                 {filteredProducts.map((product, index) => {
@@ -831,12 +894,7 @@ const Products = () => {
                                 {loadingMore && (
                                     <>
                                         {[...Array(4)].map((_, i) => (
-                                            <div
-                                                key={`skeleton-${i}`}
-                                                className="product-card glass-card glass-skeleton"
-                                            >
-                                                <div className="skeleton-shimmer"></div>
-                                            </div>
+                                            <ProductCardSkeleton key={`more-skeleton-${i}`} />
                                         ))}
                                     </>
                                 )}

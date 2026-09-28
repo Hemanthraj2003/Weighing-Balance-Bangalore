@@ -1301,18 +1301,137 @@
     border-bottom: 1px solid rgba(229, 231, 235, 0.7) !important;
 }
 
-/* Glass skeleton shimmer */
+/* Glass skeleton placeholder details */
 .product-card.glass-skeleton {
     min-height: 480px;
-    background: rgba(255, 255, 255, 0.5);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.65);
-    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.72) !important;
+    backdrop-filter: blur(16px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.85) !important;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.04) !important;
+    border-radius: 14px !important;
     display: flex;
     flex-direction: column;
     overflow: hidden;
     position: relative;
+    pointer-events: none;
+    user-select: none;
+}
+
+.product-card.glass-skeleton .product-brand-logo.skeleton-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(243, 244, 246, 0.6);
+    border-bottom: 1px solid rgba(229, 231, 235, 0.7);
+    min-height: 40px;
+    padding: 8px 12px;
+}
+
+.skeleton-brand-line {
+    width: 90px;
+    height: 18px;
+    border-radius: 4px;
+}
+
+.product-card.glass-skeleton .product-image-box.skeleton-box {
+    height: 190px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(248, 250, 252, 0.5);
+    border-bottom: 1px solid rgba(229, 231, 235, 0.7);
+    position: relative;
+    overflow: hidden;
+}
+
+.skeleton-image-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.35;
+}
+
+.skeleton-image-icon {
+    font-size: 38px;
+    color: #94a3b8;
+}
+
+.skeleton-line {
+    display: block;
+    height: 13px;
+    border-radius: 4px;
+    background: rgba(209, 213, 219, 0.55);
+    position: relative;
+    overflow: hidden;
+}
+
+.skeleton-line::after,
+.skeleton-image-placeholder::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 0.75) 50%,
+        rgba(255, 255, 255, 0) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.6s infinite;
+}
+
+.skeleton-row {
+    padding: 7px 0 !important;
+}
+
+.skeleton-label-line {
+    justify-self: start;
+}
+
+.skeleton-value-line {
+    justify-self: end;
+}
+
+/* Skeleton buttons matching real buttons */
+.skeleton-btn {
+    position: relative;
+    overflow: hidden;
+    cursor: default;
+    border: none !important;
+}
+
+.skeleton-btn::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 0.38) 50%,
+        rgba(255, 255, 255, 0) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.6s infinite;
+}
+
+.skeleton-btn-red {
+    background: rgba(201, 31, 37, 0.7) !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 8px rgba(201, 31, 37, 0.2) !important;
+}
+
+.skeleton-btn-green {
+    background: rgba(37, 211, 102, 0.7) !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 8px rgba(37, 211, 102, 0.2) !important;
 }
 
 .skeleton-shimmer {
