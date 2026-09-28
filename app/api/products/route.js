@@ -10,6 +10,8 @@ export async function GET(request) {
     const limitParam = searchParams.get("limit");
     const categoryParam = searchParams.get("category");
     const searchParam = searchParams.get("search");
+    const readabilityParam = searchParams.get("readability");
+    const capacityParam = searchParams.get("capacity");
 
     // If pagination requested
     if (pageParam !== null || limitParam !== null) {
@@ -27,6 +29,33 @@ export async function GET(request) {
           { model: { contains: searchParam, mode: "insensitive" } },
           { category: { contains: searchParam, mode: "insensitive" } },
         ];
+      }
+
+      const andConditions = [];
+      if (readabilityParam) {
+        const readabilities = readabilityParam.split(",").map((s) => s.trim()).filter(Boolean);
+        if (readabilities.length > 0) {
+          andConditions.push({
+            OR: readabilities.map((r) => ({
+              features: { contains: r, mode: "insensitive" },
+            })),
+          });
+        }
+      }
+
+      if (capacityParam) {
+        const capacities = capacityParam.split(",").map((s) => s.trim()).filter(Boolean);
+        if (capacities.length > 0) {
+          andConditions.push({
+            OR: capacities.map((c) => ({
+              features: { contains: c, mode: "insensitive" },
+            })),
+          });
+        }
+      }
+
+      if (andConditions.length > 0) {
+        where.AND = andConditions;
       }
 
       const [products, total] = await Promise.all([

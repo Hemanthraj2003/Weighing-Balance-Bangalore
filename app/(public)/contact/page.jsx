@@ -733,7 +733,7 @@ ${formData.message}
                             <div className="office-image">
 
                                 <img
-                                    src="/images/contact/contact-side%20image.png"
+                                    src="/images/contact/contact-side-image.png"
                                     alt="Weighing Balance Bangalore office"
                                 />
 

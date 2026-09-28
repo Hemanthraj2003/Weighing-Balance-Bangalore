@@ -97,6 +97,16 @@ const Products = () => {
     const [searchInput, setSearchInput] = useState("");
     const [searchTerm, setSearchTerm] = useState("");
 
+    // Mobile/Toolbar Filter Drawer State
+    const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
+
+    // All database filter options (readability & capacity)
+    const [allFilterOptions, setAllFilterOptions] = useState({ readability: [], capacity: [] });
+
+    // Sticky toolbar & search input refs for sticky tracking
+    const toolbarRef = useRef(null);
+    const searchInputRef = useRef(null);
+
     // In-memory page cache: cacheKey -> { products, total, totalPages, hasMore }
     const cacheRef = useRef(new Map());
 
@@ -169,6 +179,24 @@ const Products = () => {
         }
     }, []);
 
+    // Fetch all database filter options (readability & capacity) on mount
+    useEffect(() => {
+        const cachedFilters = getCachedData("all_filter_options");
+        if (cachedFilters) {
+            setAllFilterOptions(cachedFilters);
+        } else {
+            fetch(`${API_URL}/products/filters`)
+                .then((res) => (res.ok ? res.json() : null))
+                .then((data) => {
+                    if (data && Array.isArray(data.readability) && Array.isArray(data.capacity)) {
+                        setAllFilterOptions(data);
+                        setCachedData("all_filter_options", data);
+                    }
+                })
+                .catch((err) => console.error("Filters fetch error:", err));
+        }
+    }, []);
+
     // Core fetch function with caching & batch loading
     const fetchProducts = useCallback(
         async (targetPage, isLoadMore = false) => {
@@ -179,7 +207,9 @@ const Products = () => {
             }
             setError("");
 
-            const cacheKey = `${selectedCategory}_${searchTerm.trim().toLowerCase()}_p${targetPage}`;
+            const rKey = [...selectedReadability].sort().join(",");
+            const cKey = [...selectedCapacity].sort().join(",");
+            const cacheKey = `${selectedCategory}_${searchTerm.trim().toLowerCase()}_r:${rKey}_c:${cKey}_p${targetPage}`;
             const cached = getCachedData(cacheKey);
 
             if (cached) {
@@ -212,6 +242,12 @@ const Products = () => {
                 }
                 if (searchTerm.trim()) {
                     params.set("search", searchTerm.trim());
+                }
+                if (selectedReadability.length > 0) {
+                    params.set("readability", selectedReadability.join(","));
+                }
+                if (selectedCapacity.length > 0) {
+                    params.set("capacity", selectedCapacity.join(","));
                 }
 
                 const response = await fetch(`${API_URL}/products?${params.toString()}`);
@@ -255,10 +291,10 @@ const Products = () => {
                 setLoadingMore(false);
             }
         },
-        [selectedCategory, searchTerm]
+        [selectedCategory, searchTerm, selectedReadability, selectedCapacity]
     );
 
-    // Re-fetch page 1 when category or search changes
+    // Re-fetch page 1 when category, search, readability, or capacity changes
     useEffect(() => {
         fetchProducts(1, false);
     }, [fetchProducts]);
@@ -440,7 +476,7 @@ const Products = () => {
     };
 
     /* =========================================================
-       CREATE PRODUCT CATEGORIES FOR SIDEBAR
+       CREATE PRODUCT CATEGORIES FOR SIDEBAR & DRAWER
     ========================================================= */
     const categoryMap = new Map();
 
@@ -486,21 +522,27 @@ const Products = () => {
     /* =========================================================
        FILTER OPTIONS (Readability & Capacity)
     ========================================================= */
-    const readabilityOptions = [
-        ...new Set(
-            products
-                .map((product) => getFeatureValue(product, "Readability"))
-                .filter((value) => hasValidValue(value))
-        ),
-    ];
+    const readabilityOptions =
+        allFilterOptions.readability.length > 0
+            ? allFilterOptions.readability
+            : [
+                  ...new Set(
+                      products
+                          .map((product) => getFeatureValue(product, "Readability"))
+                          .filter((value) => hasValidValue(value))
+                  ),
+              ];
 
-    const capacityOptions = [
-        ...new Set(
-            products
-                .map((product) => getFeatureValue(product, "Capacity"))
-                .filter((value) => hasValidValue(value))
-        ),
-    ];
+    const capacityOptions =
+        allFilterOptions.capacity.length > 0
+            ? allFilterOptions.capacity
+            : [
+                  ...new Set(
+                      products
+                          .map((product) => getFeatureValue(product, "Capacity"))
+                          .filter((value) => hasValidValue(value))
+                  ),
+              ];
 
     const toggleReadability = (value) => {
         setSelectedReadability((previous) => {
@@ -534,23 +576,16 @@ const Products = () => {
             ? "All Products"
             : categories.find((c) => c.id === selectedCategory)?.name || "Products";
 
+    const activeFiltersCount =
+        (selectedCategory !== "all" ? 1 : 0) +
+        selectedReadability.length +
+        selectedCapacity.length +
+        (searchTerm ? 1 : 0);
+
     /* =========================================================
-       FILTER LOADED PRODUCTS BY CAPACITY & READABILITY
+       PRODUCTS (SERVER-FILTERED BY CATEGORY, SEARCH, READABILITY & CAPACITY)
     ========================================================= */
-    let filteredProducts = products.filter((product) => {
-        const productReadability = getFeatureValue(product, "Readability");
-        const productCapacity = getFeatureValue(product, "Capacity");
-
-        const readabilityMatch =
-            selectedReadability.length === 0 ||
-            selectedReadability.includes(productReadability);
-
-        const capacityMatch =
-            selectedCapacity.length === 0 ||
-            selectedCapacity.includes(productCapacity);
-
-        return readabilityMatch && capacityMatch;
-    });
+    let filteredProducts = products;
 
     /* =========================================================
        SORT PRODUCTS
@@ -605,7 +640,26 @@ const Products = () => {
                 </div>
 
                 <div className="products-banner-right">
-                    <div className="banner-icon">⚖</div>
+                    <div className="banner-icon">
+                        <svg
+                            width="36"
+                            height="36"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                            aria-hidden="true"
+                        >
+                            <path d="M12 3v17" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" />
+                            <path d="M10 5.5h4" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" />
+                            <path d="M4 8h16" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" />
+                            <path d="M5 8L2.5 14" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" />
+                            <path d="M5 8L7.5 14" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" />
+                            <path d="M2.2 14h5.6c0 2.2-1.2 3.5-2.8 3.5s-2.8-1.3-2.8-3.5z" fill="#ffffff" />
+                            <path d="M19 8L16.5 14" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" />
+                            <path d="M19 8L21.5 14" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" />
+                            <path d="M16.2 14h5.6c0 2.2-1.2 3.5-2.8 3.5s-2.8-1.3-2.8-3.5z" fill="#ffffff" />
+                        </svg>
+                    </div>
                     <div>
                         <h3>High Precision | Accurate | Reliable</h3>
                         <p>Professional laboratory and industrial weighing solutions</p>
@@ -615,7 +669,7 @@ const Products = () => {
 
             {/* MAIN PRODUCTS AREA */}
             <section className="products-layout">
-                {/* SIDEBAR */}
+                {/* DESKTOP STICKY SIDEBAR (Hidden on mobile/tablet) */}
                 <aside className="products-sidebar">
                     {/* PRODUCT CATEGORIES */}
                     <div className="sidebar-box">
@@ -687,9 +741,92 @@ const Products = () => {
 
                 {/* PRODUCTS CONTENT */}
                 <main className="products-content">
-                    {/* PRODUCTS TOOLBAR */}
-                    <div className="products-toolbar">
-                        <p>
+                    {/* PRODUCTS TOOLBAR (STICKY ON SCROLL - 1 COMPACT ROW: 85% SEARCH, 15% FILTER) */}
+                    <div ref={toolbarRef} className="products-toolbar-sticky">
+                        <div className="toolbar-main-controls">
+                            {/* SEARCH BAR (85%) */}
+                            <div className="toolbar-search-box">
+                                <div className="product-search">
+                                    <svg
+                                        className="search-svg-icon"
+                                        width="18"
+                                        height="18"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2.2"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                    >
+                                        <circle cx="11" cy="11" r="8" />
+                                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                                    </svg>
+                                    <input
+                                        ref={searchInputRef}
+                                        type="text"
+                                        placeholder="Search products by model, name, capacity..."
+                                        value={searchInput}
+                                        onChange={(event) => setSearchInput(event.target.value)}
+                                        aria-label="Search products"
+                                    />
+                                    {searchInput && (
+                                        <button
+                                            type="button"
+                                            className="search-clear-btn"
+                                            onClick={() => {
+                                                setSearchInput("");
+                                                setSearchTerm("");
+                                            }}
+                                            aria-label="Clear search"
+                                        >
+                                            ✕
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* FILTER BUTTON NEXT TO SEARCH (15%) */}
+                            <button
+                                type="button"
+                                className={`toolbar-filter-btn ${
+                                    activeFiltersCount > 0 ? "has-filters" : ""
+                                }`}
+                                onClick={() => setFilterDrawerOpen(true)}
+                                aria-label="Open filter drawer"
+                                title="Filter by Category, Readability & Capacity"
+                            >
+                                <svg
+                                    className="filter-svg-icon"
+                                    width="17"
+                                    height="17"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2.2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                >
+                                    <line x1="4" y1="21" x2="4" y2="14" />
+                                    <line x1="4" y1="10" x2="4" y2="3" />
+                                    <line x1="12" y1="21" x2="12" y2="12" />
+                                    <line x1="12" y1="8" x2="12" y2="3" />
+                                    <line x1="20" y1="21" x2="20" y2="16" />
+                                    <line x1="20" y1="12" x2="20" y2="3" />
+                                    <line x1="1" y1="14" x2="7" y2="14" />
+                                    <line x1="9" y1="8" x2="15" y2="8" />
+                                    <line x1="17" y1="16" x2="23" y2="16" />
+                                </svg>
+                                <span className="filter-label-text">Filters</span>
+                                {activeFiltersCount > 0 && (
+                                    <span className="filter-badge">{activeFiltersCount}</span>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* RESULTS COUNT STATUS (NON-STICKY) */}
+                    <div className="toolbar-status-row">
+                        <p className="toolbar-count-text">
                             {loading && products.length === 0 ? (
                                 "Loading products..."
                             ) : (
@@ -704,29 +841,15 @@ const Products = () => {
                                 </>
                             )}
                         </p>
-
-                        {/* SEARCH */}
-                        <div className="product-search">
-                            <input
-                                type="text"
-                                placeholder="Search products..."
-                                value={searchInput}
-                                onChange={(event) => setSearchInput(event.target.value)}
-                            />
-                        </div>
-
-                        {/* SORT */}
-                        <div className="sort-area">
-                            <span>Sort by:</span>
-                            <select
-                                value={sortBy}
-                                onChange={(event) => setSortBy(event.target.value)}
+                        {activeFiltersCount > 0 && (
+                            <button
+                                type="button"
+                                className="toolbar-quick-clear"
+                                onClick={clearFilters}
                             >
-                                <option value="popularity">Popularity</option>
-                                <option value="name-asc">Name: A-Z</option>
-                                <option value="name-desc">Name: Z-A</option>
-                            </select>
-                        </div>
+                                Reset filters
+                            </button>
+                        )}
                     </div>
 
                     {/* PRODUCT GRID */}
@@ -950,6 +1073,131 @@ const Products = () => {
                     )}
                 </main>
             </section>
+
+            {/* UNIFIED FILTER DRAWER (MODAL / BOTTOM SHEET) */}
+            {filterDrawerOpen && (
+                <div
+                    className="mobile-filter-drawer-overlay"
+                    onClick={() => setFilterDrawerOpen(false)}
+                >
+                    <div
+                        className="mobile-filter-drawer"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="drawer-header">
+                            <h3>Filters & Categories</h3>
+                            <button
+                                type="button"
+                                className="drawer-close-btn"
+                                onClick={() => setFilterDrawerOpen(false)}
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="drawer-body">
+                            {/* ALL PRODUCTS OPTION */}
+                            <button
+                                type="button"
+                                className={`drawer-cat-all ${
+                                    selectedCategory === "all" ? "active" : ""
+                                }`}
+                                onClick={() => setSelectedCategory("all")}
+                            >
+                                <span className="cat-icon">▦</span>
+                                <span>All Products (Show Everything)</span>
+                                {selectedCategory === "all" && (
+                                    <span className="cat-check">✓</span>
+                                )}
+                            </button>
+
+                            {/* PRODUCT CATEGORIES (33 categories) */}
+                            <div className="drawer-section">
+                                <h4>Product Categories ({categories.length - 1})</h4>
+                                <div className="drawer-categories-list">
+                                    {categories
+                                        .filter((c) => c.id !== "all")
+                                        .map((category) => (
+                                            <button
+                                                key={category.id}
+                                                type="button"
+                                                className={`drawer-cat-item ${
+                                                    selectedCategory === category.id
+                                                        ? "active"
+                                                        : ""
+                                                }`}
+                                                onClick={() => {
+                                                    setSelectedCategory(category.id);
+                                                }}
+                                            >
+                                                <span className="cat-icon">{category.icon}</span>
+                                                <span className="cat-name">{category.name}</span>
+                                                {selectedCategory === category.id && (
+                                                    <span className="cat-check">✓</span>
+                                                )}
+                                            </button>
+                                        ))}
+                                </div>
+                            </div>
+
+                            {/* READABILITY */}
+                            {readabilityOptions.length > 0 && (
+                                <div className="drawer-section">
+                                    <h4>Readability</h4>
+                                    <div className="drawer-filter-options">
+                                        {readabilityOptions.map((value) => (
+                                            <label key={value}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedReadability.includes(value)}
+                                                    onChange={() => toggleReadability(value)}
+                                                />
+                                                <span>{value}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* CAPACITY */}
+                            {capacityOptions.length > 0 && (
+                                <div className="drawer-section">
+                                    <h4>Capacity</h4>
+                                    <div className="drawer-filter-options">
+                                        {capacityOptions.map((value) => (
+                                            <label key={value}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedCapacity.includes(value)}
+                                                    onChange={() => toggleCapacity(value)}
+                                                />
+                                                <span>{value}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="drawer-footer">
+                            <button
+                                type="button"
+                                className="drawer-clear-btn"
+                                onClick={clearFilters}
+                            >
+                                Clear All
+                            </button>
+                            <button
+                                type="button"
+                                className="drawer-apply-btn"
+                                onClick={() => setFilterDrawerOpen(false)}
+                            >
+                                Apply Filters ({totalProducts || filteredProducts.length})
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
