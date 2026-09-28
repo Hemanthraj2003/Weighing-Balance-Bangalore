@@ -1260,6 +1260,17 @@
    GLASSCARD STYLING (GLASSMORPHISM)
 ================================================= */
 
+@keyframes glassCardFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 .product-card.glass-card {
     background: rgba(255, 255, 255, 0.78) !important;
     backdrop-filter: blur(16px) saturate(180%) !important;
@@ -1270,6 +1281,7 @@
     transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease, border-color 0.3s ease !important;
     position: relative;
     overflow: hidden;
+    animation: glassCardFadeIn 0.4s ease-out forwards;
 }
 
 .product-card.glass-card:hover {
@@ -1322,17 +1334,17 @@
 }
 
 /* =================================================
-   PAGINATION & LOAD MORE ON DEMAND
+   INFINITE SCROLL & LAZY LOAD STATUS
 ================================================= */
 
-.pagination-container {
+.infinite-scroll-container {
     width: 100%;
     margin-top: 36px;
-    margin-bottom: 30px;
+    margin-bottom: 40px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 18px;
+    gap: 16px;
     grid-column: 1 / -1;
 }
 
@@ -1347,7 +1359,7 @@
 }
 
 .progress-bar-bg {
-    width: 220px;
+    width: 240px;
     height: 6px;
     background: rgba(0, 0, 0, 0.08);
     border-radius: 10px;
@@ -1361,80 +1373,47 @@
     transition: width 0.4s ease;
 }
 
-.load-more-btn {
-    background: linear-gradient(135deg, #aa1015, #d91e26) !important;
-    color: #ffffff !important;
-    border: 1px solid rgba(255, 255, 255, 0.35) !important;
-    border-radius: 50px !important;
-    padding: 13px 34px !important;
-    font-size: 15px !important;
-    font-weight: 700 !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 10px !important;
-    cursor: pointer !important;
-    box-shadow: 0 8px 24px rgba(170, 16, 21, 0.28) !important;
-    transition: all 0.25s ease !important;
-}
-
-.load-more-btn:hover:not(:disabled) {
-    transform: translateY(-2px) scale(1.02) !important;
-    box-shadow: 0 12px 32px rgba(217, 30, 38, 0.4) !important;
-}
-
-.load-more-btn:disabled {
-    opacity: 0.65 !important;
-    cursor: not-allowed !important;
-}
-
-.pagination-pages {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-    justify-content: center;
-}
-
-.page-btn {
-    min-width: 40px;
-    height: 40px;
-    padding: 0 12px;
+.infinite-scroll-loading {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    border-radius: 10px;
+    gap: 12px;
+    padding: 12px 28px;
     background: rgba(255, 255, 255, 0.85);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 50px;
     color: #374151;
     font-size: 14px;
     font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.04);
 }
 
-.page-btn:hover:not(:disabled) {
-    border-color: #aa1015;
-    color: #aa1015;
-    background: #ffffff;
-    transform: translateY(-1px);
+.infinite-scroll-spinner {
+    width: 18px;
+    height: 18px;
+    border: 2.5px solid rgba(170, 16, 21, 0.2);
+    border-top-color: #aa1015;
+    border-radius: 50%;
+    animation: infiniteSpinner 0.8s linear infinite;
 }
 
-.page-btn.active {
-    background: linear-gradient(135deg, #aa1015, #d91e26) !important;
-    color: #ffffff !important;
-    border-color: transparent !important;
-    box-shadow: 0 4px 14px rgba(170, 16, 21, 0.3) !important;
+@keyframes infiniteSpinner {
+    to {
+        transform: rotate(360deg);
+    }
 }
 
-.page-btn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-}
-
-.page-ellipsis {
-    color: #9ca3af;
-    font-weight: 700;
-    padding: 0 4px;
+.infinite-scroll-end {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 22px;
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(8px);
+    border-radius: 30px;
+    color: #6b7280;
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid rgba(0, 0, 0, 0.06);
 }

@@ -15,7 +15,7 @@ const Products = () => {
     const [loadingMore, setLoadingMore] = useState(false);
     const [error, setError] = useState("");
 
-    // Pagination
+    // Pagination & Infinite Scroll State
     const [page, setPage] = useState(1);
     const [totalProducts, setTotalProducts] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
@@ -31,7 +31,7 @@ const Products = () => {
     const [searchInput, setSearchInput] = useState("");
     const [searchTerm, setSearchTerm] = useState("");
 
-    // In-memory page cache ref: cacheKey -> { products, total, totalPages, hasMore }
+    // In-memory page cache: cacheKey -> { products, total, totalPages, hasMore }
     const cacheRef = useRef(new Map());
 
     // Helper: prefetch / pre-cache images in browser HTTP cache
@@ -103,7 +103,7 @@ const Products = () => {
         }
     }, []);
 
-    // Core fetch function with caching & pagination
+    // Core fetch function with caching & batch loading
     const fetchProducts = useCallback(
         async (targetPage, isLoadMore = false) => {
             if (isLoadMore) {
@@ -196,6 +196,46 @@ const Products = () => {
     useEffect(() => {
         fetchProducts(1, false);
     }, [fetchProducts]);
+
+    /* =========================================================
+       INFINITE SCROLL INTERSECTION OBSERVER
+       Triggers loading next 10 products when user reaches
+       the 9th product of the current batch.
+    ========================================================= */
+    const observer = useRef(null);
+    const triggerItemRef = useCallback(
+        (node) => {
+            if (loading || loadingMore) return;
+            if (observer.current) observer.current.disconnect();
+
+            if (!node || !hasMore) return;
+
+            observer.current = new IntersectionObserver(
+                (entries) => {
+                    if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
+                        fetchProducts(page + 1, true);
+                    }
+                },
+                {
+                    root: null,
+                    rootMargin: "150px", // Trigger slightly before reaching the 9th item for seamless scrolling
+                    threshold: 0.1,
+                }
+            );
+
+            observer.current.observe(node);
+        },
+        [loading, loadingMore, hasMore, page, fetchProducts]
+    );
+
+    // Disconnect observer on unmount
+    useEffect(() => {
+        return () => {
+            if (observer.current) {
+                observer.current.disconnect();
+            }
+        };
+    }, []);
 
     /* =========================================================
        GET PRODUCT FEATURE VALUE
@@ -462,25 +502,6 @@ const Products = () => {
     }
 
     /* =========================================================
-       PAGINATION HANDLERS
-    ========================================================= */
-    const handleLoadMore = () => {
-        if (!loadingMore && hasMore) {
-            fetchProducts(page + 1, true);
-        }
-    };
-
-    const handleGoToPage = (targetPage) => {
-        if (targetPage >= 1 && targetPage <= totalPages && targetPage !== page) {
-            fetchProducts(targetPage, false);
-            const element = document.querySelector(".products-content");
-            if (element) {
-                element.scrollIntoView({ behavior: "smooth", block: "start" });
-            }
-        }
-    };
-
-    /* =========================================================
        INITIAL LOADING STATE
     ========================================================= */
     if (loading && products.length === 0) {
@@ -623,9 +644,9 @@ const Products = () => {
                         <p>
                             Showing{" "}
                             <strong>
-                                {products.length > 0 ? `1–${products.length}` : "0"}
+                                {filteredProducts.length > 0 ? `1–${filteredProducts.length}` : "0"}
                             </strong>{" "}
-                            of <strong>{totalProducts || products.length}</strong> results
+                            of <strong>{totalProducts || filteredProducts.length}</strong> results
                         </p>
 
                         {/* SEARCH */}
@@ -656,7 +677,7 @@ const Products = () => {
                     {filteredProducts.length > 0 ? (
                         <>
                             <div className="products-grid">
-                                {filteredProducts.map((product) => {
+                                {filteredProducts.map((product, index) => {
                                     const capacity = getFeatureValue(product, "Capacity");
                                     const readability = getFeatureValue(product, "Readability");
                                     const productName = product.name || "Product";
@@ -665,10 +686,16 @@ const Products = () => {
                                         : "";
                                     const category = getCategoryName(product);
 
+                                    // The 9th product of the current batch triggers loading next 10 on scroll
+                                    const isTriggerItem =
+                                        hasMore &&
+                                        index === Math.max(0, filteredProducts.length - 2);
+
                                     return (
                                         <article
                                             className="product-card glass-card"
                                             key={product.id}
+                                            ref={isTriggerItem ? triggerItemRef : null}
                                         >
                                             {/* BRAND IMAGE */}
                                             <div className="product-brand-logo">
@@ -800,7 +827,7 @@ const Products = () => {
                                     );
                                 })}
 
-                                {/* SKELETON SHIMMER PLACEHOLDERS DURING LOAD MORE */}
+                                {/* SKELETON SHIMMER PLACEHOLDERS DURING INFINITE SCROLL LOAD */}
                                 {loadingMore && (
                                     <>
                                         {[...Array(4)].map((_, i) => (
@@ -815,13 +842,13 @@ const Products = () => {
                                 )}
                             </div>
 
-                            {/* PAGINATION & LOAD MORE CONTAINER */}
+                            {/* INFINITE SCROLL BOTTOM STATUS */}
                             {totalProducts > 0 && (
-                                <div className="pagination-container">
+                                <div className="infinite-scroll-container">
                                     {/* Progress indicator */}
                                     <div className="pagination-progress">
                                         <span>
-                                            Showing <strong>{products.length}</strong> of{" "}
+                                            Showing <strong>{filteredProducts.length}</strong> of{" "}
                                             <strong>{totalProducts}</strong> products
                                         </span>
                                         <div className="progress-bar-bg">
@@ -831,7 +858,7 @@ const Products = () => {
                                                     width: `${Math.min(
                                                         100,
                                                         Math.round(
-                                                            (products.length / totalProducts) * 100
+                                                            (filteredProducts.length / totalProducts) * 100
                                                         )
                                                     )}%`,
                                                 }}
@@ -839,90 +866,18 @@ const Products = () => {
                                         </div>
                                     </div>
 
-                                    {/* Load More Button (On Demand) */}
-                                    {hasMore && (
-                                        <button
-                                            type="button"
-                                            className="load-more-btn"
-                                            onClick={handleLoadMore}
-                                            disabled={loadingMore}
-                                        >
-                                            {loadingMore ? (
-                                                <>⏳ Loading Next 10 Products...</>
-                                            ) : (
-                                                <>
-                                                    <span>⬇</span> Load Next 10 Products (
-                                                    {Math.min(10, totalProducts - products.length)}{" "}
-                                                    more)
-                                                </>
-                                            )}
-                                        </button>
+                                    {/* Loading indicator */}
+                                    {loadingMore && (
+                                        <div className="infinite-scroll-loading">
+                                            <div className="infinite-scroll-spinner" />
+                                            <span>Loading next 10 products...</span>
+                                        </div>
                                     )}
 
-                                    {/* Page navigation buttons */}
-                                    {totalPages > 1 && (
-                                        <div className="pagination-pages">
-                                            <button
-                                                type="button"
-                                                className="page-btn"
-                                                onClick={() => handleGoToPage(page - 1)}
-                                                disabled={page <= 1 || loadingMore || loading}
-                                                title="Previous Page"
-                                            >
-                                                ‹ Prev
-                                            </button>
-
-                                            {Array.from({ length: totalPages }, (_, i) => i + 1)
-                                                .filter((p) => {
-                                                    return (
-                                                        p === 1 ||
-                                                        p === totalPages ||
-                                                        Math.abs(p - page) <= 2
-                                                    );
-                                                })
-                                                .map((p, idx, arr) => {
-                                                    const prevPageNum = arr[idx - 1];
-                                                    const showEllipsis =
-                                                        prevPageNum && p - prevPageNum > 1;
-                                                    return (
-                                                        <span
-                                                            key={p}
-                                                            style={{
-                                                                display: "inline-flex",
-                                                                alignItems: "center",
-                                                                gap: "6px",
-                                                            }}
-                                                        >
-                                                            {showEllipsis && (
-                                                                <span className="page-ellipsis">
-                                                                    …
-                                                                </span>
-                                                            )}
-                                                            <button
-                                                                type="button"
-                                                                className={`page-btn ${
-                                                                    page === p ? "active" : ""
-                                                                }`}
-                                                                onClick={() => handleGoToPage(p)}
-                                                                disabled={loadingMore || loading}
-                                                            >
-                                                                {p}
-                                                            </button>
-                                                        </span>
-                                                    );
-                                                })}
-
-                                            <button
-                                                type="button"
-                                                className="page-btn"
-                                                onClick={() => handleGoToPage(page + 1)}
-                                                disabled={
-                                                    page >= totalPages || loadingMore || loading
-                                                }
-                                                title="Next Page"
-                                            >
-                                                Next ›
-                                            </button>
+                                    {/* End of list indicator */}
+                                    {!hasMore && filteredProducts.length > 0 && (
+                                        <div className="infinite-scroll-end">
+                                            <span>✓</span> All {totalProducts} products loaded
                                         </div>
                                     )}
                                 </div>
