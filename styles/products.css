@@ -106,13 +106,41 @@
     display: grid;
 
     grid-template-columns:
-        240px minmax(0, 1fr);
+        250px minmax(0, 1fr);
 
     gap: 25px;
+
+    align-items: start;
 }
 
 .products-sidebar {
     width: 100%;
+    position: sticky;
+    top: 20px;
+    align-self: start;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 6px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(201, 31, 37, 0.3) transparent;
+}
+
+.products-sidebar::-webkit-scrollbar {
+    width: 5px;
+}
+
+.products-sidebar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.products-sidebar::-webkit-scrollbar-thumb {
+    background: rgba(201, 31, 37, 0.3);
+    border-radius: 10px;
+}
+
+.products-sidebar::-webkit-scrollbar-thumb:hover {
+    background: rgba(201, 31, 37, 0.6);
 }
 
 .products-content {
